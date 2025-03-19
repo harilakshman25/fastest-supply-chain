@@ -1,0 +1,48 @@
+{
+  "name": "fastest-delivery-system",
+  "version": "1.0.0",
+  "description": "Fast delivery supply chain management system",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "server": "nodemon server/server.js",
+    "client": "cd client && npm start",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "cd client && npm run build",
+    "install-client": "cd client && npm install",
+    "install-server": "npm install",
+    "install-all": "npm run install-server && npm run install-client"
+  },
+  "keywords": [
+    "delivery",
+    "ecommerce",
+    "mongodb",
+    "express",
+    "react",
+    "node"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "connect-redis": "^7.1.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.0.0",
+    "jsonwebtoken": "^9.0.1",
+    "mongoose": "^7.4.3",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.4",
+    "redis": "^4.6.7",
+    "socket": "^0.14.62",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "nodemon": "^3.0.1"
+  }
+}
