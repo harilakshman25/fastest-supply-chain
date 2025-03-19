@@ -3,7 +3,8 @@ const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const Store = require('../models/Store');
-
+require('dotenv').config();
+const mongoose=require('mongoose');
 // @desc    Register a user
 // @route   POST /api/auth/register
 // @access  Public
@@ -77,6 +78,25 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    //For admin 
+    if(email==="admin@gmail.com"){
+       let adminpassword=process.env.ADMIN_PASSWORD;
+       if(password!==adminpassword){
+        return res.status(400).json({ msg: 'Invalid Credentials' });
+       }
+       const payload = {
+        user: {
+          id: mongoose.Schema.Types.ObjectId,
+          role: "admin"
+        }
+      };
+      const userData = { id:mongoose.Schema.Types.ObjectId, name: "admin", email: "admin@gmail.com",role:"admin"}
+      jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5 days' }, (err, token) => {
+        if (err) throw err;
+        return res.json({ token, user: userData });
+      });
+     
+    }
     // See if user exists
     let user = await User.findOne({ email });
 

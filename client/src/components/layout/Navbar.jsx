@@ -76,7 +76,6 @@ const Navbar = () => {
                     {cartItems?.length > 0 && (
                       <span className="badge bg-secondary ms-1">{cartItems?.length}</span>
                     )}
-
                   </Link>
                 </li>
               </>
