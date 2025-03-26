@@ -10,15 +10,20 @@ const roleCheck = require('../middleware/roleCheck');
 // @access  Public
 router.get('/', storeController.getAllStores);
 
-// @route   GET api/stores/:id
-// @desc    Get store by ID
-// @access  Public
-router.get('/:id', storeController.getStoreById);
-
 // @route   GET api/stores/manager/:managerId
 // @desc    Get store by manager ID
 // @access  Private (Store Manager)
 router.get('/manager/:managerId', auth, roleCheck(['store_manager', 'admin']), storeController.getStoreByManager);
+
+// @route   GET api/stores/nearby
+// @desc    Get nearby stores
+// @access  Public
+router.get('/nearby', storeController.getNearbyStores);
+
+// @route   GET api/stores/:id
+// @desc    Get store by ID
+// @access  Public
+router.get('/:id', storeController.getStoreById);
 
 // @route   POST api/stores
 // @desc    Create a store
@@ -56,16 +61,14 @@ router.put(
   storeController.updateStore
 );
 
-// @route   GET api/stores/nearby
-// @desc    Get nearby stores
-// @access  Public
-router.get('/nearby', storeController.getNearbyStores);
-
 // @route   GET api/stores/:id/products
 // @desc    Get all products in a store
 // @access  Public
 router.get('/:id/products', storeController.getStoreProducts);
 
+// @route   GET api/stores/:id/stats
+// @desc    Get store statistics
+// @access  Private
 router.get('/:id/stats', auth, storeController.getStoreStats);
 
 module.exports = router;

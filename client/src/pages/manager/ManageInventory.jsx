@@ -3,22 +3,21 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getStoreByManager } from '../../redux/slices/storeSlice';
-import { getStoreProducts, updateProductInventory } from '../../redux/slices/productSlice';
+import { getStoreProducts, updateProductQuantity } from '../../redux/slices/productSlice';
 import { toast } from 'react-toastify';
 
 const ManageInventory = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
-  const { store } = useSelector(state => state.store);
-  const { products, loading } = useSelector(state => state.product);
+  const { store, loadingStates: storeLoadingStates, error: storeError } = useSelector(state => state.store);
+  const { products, loadingStates: productLoadingStates, error: productError } = useSelector(state => state.product);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [quantityUpdate, setQuantityUpdate] = useState({});
+  const [inventory, setInventory] = useState({});
   
   useEffect(() => {
-    if (user && user._id) {
-      dispatch(getStoreByManager(user._id));
+    if (user && user.id) {
+      dispatch(getStoreByManager(user.id));
     }
   }, [dispatch, user]);
   
@@ -28,82 +27,93 @@ const ManageInventory = () => {
     }
   }, [dispatch, store]);
   
-  const handleSearch = e => {
+  useEffect(() => {
+    if (products && products.length > 0) {
+      const initialInventory = {};
+      products.forEach(product => {
+        const storeInventory = product.inventory.find(inv => inv.store.toString() === store._id);
+        if (storeInventory) {
+          initialInventory[product._id] = storeInventory.quantity;
+        } else {
+          initialInventory[product._id] = 0;
+        }
+      });
+      setInventory(initialInventory);
+    }
+  }, [products, store]);
+  
+  const handleSearch = (e) => {
     setSearchTerm(e.target.value);
   };
   
-  const handleEdit = (productId, currentQuantity) => {
-    setEditingProduct(productId);
-    setQuantityUpdate({
-      ...quantityUpdate,
-      [productId]: currentQuantity
-    });
-  };
-  
   const handleQuantityChange = (productId, value) => {
-    setQuantityUpdate({
-      ...quantityUpdate,
-      [productId]: parseInt(value)
+    setInventory({
+      ...inventory,
+      [productId]: parseInt(value) || 0
     });
   };
   
-  const handleSave = async (productId) => {
-    if (store && store._id) {
-      try {
-        await dispatch(updateProductInventory({
-          productId,
-          storeId: store._id,
-          quantity: quantityUpdate[productId]
-        })).unwrap();
-        setEditingProduct(null);
+  const handleUpdateInventory = (productId) => {
+    const quantity = inventory[productId];
+    
+    dispatch(updateProductQuantity({ productId, storeId: store._id, quantity }))
+      .unwrap()
+      .then(() => {
         toast.success('Inventory updated successfully');
-      } catch (error) {
+      })
+      .catch(error => {
         toast.error(error || 'Failed to update inventory');
-      }
-    }
-  };
-  
-  const handleCancel = (productId) => {
-    setEditingProduct(null);
-    
-    // Reset the quantity update
-    const product = products.find(p => p._id === productId);
-    if (product) {
-      const inventoryItem = product.inventory.find(inv => inv.store === store._id);
-      if (inventoryItem) {
-        setQuantityUpdate({
-          ...quantityUpdate,
-          [productId]: inventoryItem.quantity
-        });
-      }
-    }
-  };
-  
-  const getQuantityForProduct = (product) => {
-    if (!product || !product.inventory) return 0;
-    
-    const inventoryItem = product.inventory.find(
-      inv => inv.store._id === store._id || inv.store === store._id
-    );
-    
-    return inventoryItem ? inventoryItem.quantity : 0;
-  };
-
-  const handleBulkZero = () => {
-    if (window.confirm('Set all quantities to zero?')) {
-      filteredProducts.forEach(product => {
-        dispatch(updateProductInventory({ productId: product._id, storeId: store._id, quantity: 0 }));
       });
-      toast.success('All quantities set to zero');
-    }
   };
   
-  const filteredProducts = searchTerm
-    ? products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProducts = products
+    ? products.filter(product => 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    : products;
+    : [];
+
+  // Show loading state during initial store load
+  if (storeLoadingStates?.getStoreByManager) {
+    return (
+      <div className="container mt-5 text-center">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show store error if any
+  if (storeError) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger">
+          <h4 className="alert-heading">Error Loading Store</h4>
+          <p>{storeError}</p>
+          <hr />
+          <p className="mb-0">
+            Please try refreshing the page. If the problem persists, contact support.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no store is found
+  if (!store) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-warning">
+          <h4 className="alert-heading">No Store Found</h4>
+          <p>No store has been assigned to your account yet.</p>
+          <hr />
+          <p className="mb-0">
+            If you believe this is an error, please contact the administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="container mt-5">
@@ -143,121 +153,82 @@ const ManageInventory = () => {
             </div>
           </div>
           
-          {loading ? (
+          {productLoadingStates?.getStoreProducts ? (
             <div className="text-center my-5">
               <div className="spinner-border" role="status">
-                <span className="visually-hidden">Loading...</span>
+                <span className="visually-hidden">Loading products...</span>
               </div>
             </div>
-          ) : (
+          ) : productError ? (
+            <div className="alert alert-danger">
+              <h4 className="alert-heading">Error Loading Products</h4>
+              <p>{productError}</p>
+              <hr />
+              <p className="mb-0">
+                Please try refreshing the page. If the problem persists, contact support.
+              </p>
+            </div>
+          ) : filteredProducts.length > 0 ? (
             <div className="table-responsive">
               <table className="table table-hover">
                 <thead>
                   <tr>
+                    <th>Image</th>
                     <th>Product</th>
-                    <th>Category</th>
                     <th>Price</th>
-                    <th>Quantity</th>
+                    <th>Category</th>
+                    <th>Stock</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.length > 0 ? (
-                    filteredProducts.map(product => (
-                      <tr key={product._id}>
-                        <td>
-                          <div className="d-flex align-items-center">
-                            {product.image && (
-                              <img
-                                src={product.image}
-                                alt={product.name}
-                                className="me-2"
-                                style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-                              />
-                            )}
-                            <div>{product.name}</div>
-                          </div>
-                        </td>
-                        <td>{product.category}</td>
-                        <td>₹{product.price.toFixed(2)}</td>
-                        <td>
-                          {editingProduct === product._id ? (
-                            <input
-                              type="number"
-                              className="form-control form-control-sm"
-                              style={{ width: '80px' }}
-                              min="0"
-                              value={quantityUpdate[product._id] || 0}
-                              onChange={(e) => handleQuantityChange(product._id, e.target.value)}
-                            />
-                          ) : (
-                            getQuantityForProduct(product)
-                          )}
-                        </td>
-                        <td>
-                          {editingProduct === product._id ? (
-                            <>
-                              <button
-                                className="btn btn-sm btn-success me-1"
-                                onClick={() => handleSave(product._id)}
-                              >
-                                Save
-                              </button>
-                              <button
-                                className="btn btn-sm btn-secondary"
-                                onClick={() => handleCancel(product._id)}
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handleEdit(product._id, getQuantityForProduct(product))}
-                            >
-                              Update
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="5" className="text-center py-4">
-                        No products found. 
-                        <Link to="/manager/products" className="ms-2">Add some products</Link>
+                  {filteredProducts.map(product => (
+                    <tr key={product._id}>
+                      <td>
+                        <img 
+                          src={product.image || 'https://via.placeholder.com/50'} 
+                          alt={product.name} 
+                          width="50" 
+                          height="50"
+                          style={{ objectFit: 'cover' }}
+                        />
+                      </td>
+                      <td>{product.name}</td>
+                      <td>₹{product.price.toFixed(2)}</td>
+                      <td>{product.category}</td>
+                      <td>
+                        <div className="input-group input-group-sm" style={{ maxWidth: '150px' }}>
+                          <input
+                            type="number"
+                            className="form-control"
+                            value={inventory[product._id] || 0}
+                            onChange={(e) => handleQuantityChange(product._id, e.target.value)}
+                            min="0"
+                          />
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => handleUpdateInventory(product._id)}
+                            disabled={productLoadingStates?.updateProductQuantity}
+                          >
+                            <i className="fas fa-save"></i>
+                          </button>
+                        </div>
+                      </td>
+                      <td>
+                        <Link to={`/manager/products/${product._id}`} className="btn btn-sm btn-info me-2">
+                          <i className="fas fa-eye"></i>
+                        </Link>
                       </td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
+          ) : (
+            <div className="text-center py-5">
+              <p className="mb-0">No products found matching your criteria.</p>
+            </div>
           )}
-        </div>
-      </div>
-      
-      <div className="card shadow-sm">
-        <div className="card-header bg-white">
-          <h5 className="mb-0">Bulk Actions</h5>
-        </div>
-        <div className="card-body">
-          <div className="row">
-            <div className="col-md-4 mb-3 mb-md-0">
-              <button className="btn btn-outline-primary d-block w-100">
-                Import Inventory
-              </button>
-            </div>
-            <div className="col-md-4 mb-3 mb-md-0">
-              <button className="btn btn-outline-primary d-block w-100">
-                Export Inventory
-              </button>
-            </div>
-            <div className="col-md-4">
-              <button className="btn btn-outline-danger d-block w-100">
-                Set All to Zero
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { getStoreByManager, getStoreStats} from '../../redux/slices/storeSlice';
+import { getStoreByManager, getStoreStats } from '../../redux/slices/storeSlice';
 import { getStoreOrders } from '../../redux/slices/orderSlice';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { useNavigate } from 'react-router-dom';
@@ -10,40 +10,41 @@ import { Navigate } from 'react-router-dom';
 
 const ManagerDashboard = () => {
   const dispatch = useDispatch();
-  const { user,isAuthenticated } = useSelector(state => state.auth);
-  const { store, stats, loading ,error } = useSelector(state => state.store);
+  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const { store, stats, loadingStates, error } = useSelector(state => state.store);
   const { orders } = useSelector(state => state.order);
   const navigate = useNavigate();
-
-  
-
-  console.log('ManagerDashboard store:', store); // Add this log
-  console.log('ManagerDashboard error:', error);
-  console.log(user);
-  
-
-
   const [timeRange, setTimeRange] = useState('week');
-  
+
   useEffect(() => {
-    if (user && user._id) {
-      console.log('Dispatching getStoreByManager with user._id:', user._id);
-      dispatch(getStoreByManager(user._id));
-    }else{
-      dispatch({ type: 'store/clearLoading' });
+    if (user && user.id) {
+      console.log('ManagerDashboard - dispatching getStoreByManager with user:', user);
+      console.log('ManagerDashboard - user.id:', user.id);
+      dispatch(getStoreByManager(user.id));
+    } else {
+      console.log('ManagerDashboard - no user.id:', user);
       if (!user) {
         navigate('/login');
       }
     }
-  }, [dispatch, user, isAuthenticated,navigate]);
-  
+  }, [dispatch, user, isAuthenticated, navigate]);
+
   useEffect(() => {
     if (store && store._id) {
       dispatch(getStoreStats(store._id, timeRange));
       dispatch(getStoreOrders(store._id));
     }
   }, [dispatch, store, timeRange]);
-  
+
+  // If we have an error with a 401 status, it means our token is invalid
+  // We should redirect to login
+  useEffect(() => {
+    if (error === 'Not authorized') {
+      console.log('Authorization error detected, redirecting to login');
+      navigate('/login');
+    }
+  }, [error, navigate]);
+
   const handleTimeRangeChange = (e) => {
     setTimeRange(e.target.value);
   };
@@ -51,15 +52,13 @@ const ManagerDashboard = () => {
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
-  
-  const getPendingOrdersCount = () => {
-    return orders?.filter(order => order.status === 'pending').length || 0;
-  };
 
   if (!user) {
     return <div className="container mt-5 text-center text-danger">Please log in to access the dashboard.</div>;
   }
-  if (loading) {
+
+  // Show loading spinner only during initial store load
+  if (loadingStates.getStoreByManager) {
     return (
       <div className="container mt-5 text-center">
         <div className="spinner-border" role="status">
@@ -68,11 +67,45 @@ const ManagerDashboard = () => {
       </div>
     );
   }
-  if (error) return <div className="container mt-5 text-center text-danger">Error: {error}</div>;
-  if (!store) {
-    return <div className="container mt-5 text-center text-danger">No store found for this manager.</div>;
+
+  if (error) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger">
+          <h4 className="alert-heading">Error</h4>
+          <p>{error}</p>
+          <hr />
+          <p className="mb-0">
+            Please try refreshing the page. If the problem persists, contact support.
+          </p>
+        </div>
+      </div>
+    );
   }
-  
+
+  if (!store) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-warning">
+          <h4 className="alert-heading">No Store Found</h4>
+          <p>No store has been assigned to your account yet.</p>
+          <p>User ID: {user?.id}</p>
+          <p>User Email: {user?.email}</p>
+          <p>User Role: {user?.role}</p>
+          <hr />
+          <p>Error details: {error}</p>
+          <p className="mb-0">
+            If you believe this is an error, please contact the administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const getPendingOrdersCount = () => {
+    return orders?.filter(order => order.status === 'pending').length || 0;
+  };
+
   return (
     <div className="container mt-5">
       <div className="d-flex justify-content-between align-items-center mb-4">

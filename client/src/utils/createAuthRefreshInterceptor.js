@@ -16,40 +16,58 @@ const createAuthRefreshInterceptor = () => {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
-      if (error.response?.status === 401 && !originalRequest._retry) {
-        originalRequest._retry = true;
 
-        if (isRefreshing) {
-          return new Promise((resolve, reject) => {
-            failedQueue.push({ resolve, reject });
-          }).then((token) => {
+      // If the error is not 401 or the request has already been retried, reject
+      if (error.response?.status !== 401 || originalRequest._retry) {
+        return Promise.reject(error);
+      }
+
+      originalRequest._retry = true;
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
             originalRequest.headers['x-auth-token'] = token;
             return axios(originalRequest);
-          }).catch((err) => Promise.reject(err));
-        }
-
-        isRefreshing = true;
-
-        try {
-          const currentToken = localStorage.getItem('token');
-          console.log('Attempting to refresh token with current token:', currentToken);
-          const res = await axios.post('/api/auth/refresh-token', { token: currentToken }, { timeout: 5000 });
-          const { token } = res.data;
-          console.log('New token received:', token);
-          setAuthToken(token);
-          originalRequest.headers['x-auth-token'] = token;
-          processQueue(null, token);
-          return axios(originalRequest);
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError.response?.data);
-          processQueue(refreshError, null);
-          store.dispatch(logout());
-          return Promise.reject(refreshError);
-        } finally {
-          isRefreshing = false;
-        }
+          })
+          .catch((err) => Promise.reject(err));
       }
-      return Promise.reject(error);
+
+      isRefreshing = true;
+
+      try {
+        const currentToken = localStorage.getItem('token');
+        if (!currentToken) {
+          throw new Error('No token available');
+        }
+
+        const res = await axios.post('/api/auth/refresh-token', { token: currentToken });
+        const { token } = res.data;
+        
+        // Update token in localStorage and axios headers
+        setAuthToken(token);
+        
+        // Update the original request header
+        originalRequest.headers['x-auth-token'] = token;
+        
+        // Process any queued requests
+        processQueue(null, token);
+        
+        // Retry the original request
+        return axios(originalRequest);
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+        processQueue(refreshError, null);
+        
+        // If refresh fails, logout the user
+        store.dispatch(logout());
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+        originalRequest._retry = false;
+      }
     }
   );
 };

@@ -1,26 +1,64 @@
 import io from 'socket.io-client';
 import store from '../store';
+import { logout } from '../redux/slices/authSlice';
 
-let socket;
+let socket = null;
 
 export const initializeSocket = () => {
   const { token } = store.getState().auth;
+  
+  if (!token) {
+    console.log('No token available, skipping socket initialization');
+    return null;
+  }
+
+  if (socket) {
+    console.log('Socket already initialized');
+    return socket;
+  }
+
   socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
     auth: { token },
-    reconnectionAttempts: 5
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000
   });
 
-  socket.on('connect', () => console.log('Socket connected:', socket.id));
-  socket.on('connect_error', error => console.error('Socket error:', error));
-  socket.on('disconnect', reason => console.log('Socket disconnected:', reason));
+  socket.on('connect', () => {
+    console.log('Socket connected:', socket.id);
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error);
+    if (error.message === 'Invalid token') {
+      store.dispatch(logout());
+    }
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('Socket disconnected:', reason);
+  });
+
+  socket.on('reconnect', (attemptNumber) => {
+    console.log('Socket reconnected after', attemptNumber, 'attempts');
+  });
+
+  socket.on('reconnect_error', (error) => {
+    console.error('Socket reconnection error:', error);
+  });
 
   return socket;
 };
 
-export const getSocket = () => {
-  if (!socket) throw new Error('Socket not initialized');
-  return socket;
+export const disconnectSocket = () => {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 };
+
+export const getSocket = () => socket;
 
 // Keep existing functions (joinOrderRoom, etc.)
 export const joinOrderRoom = (orderId) => {
@@ -56,12 +94,6 @@ export const unsubscribeFromOrderUpdates = () => {
 export const unsubscribeFromLocationUpdates = () => {
   if (socket) {
     socket.off('location_updated');
-  }
-};
-
-export const disconnectSocket = () => {
-  if (socket) {
-    socket.disconnect();
   }
 };
 

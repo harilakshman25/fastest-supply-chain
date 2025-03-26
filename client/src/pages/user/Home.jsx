@@ -2,28 +2,30 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { getProducts } from '../../redux/slices/productSlice';
+import { getAllProducts } from '../../redux/slices/productSlice';
 import { getStores, clearStoreErrors} from '../../redux/slices/storeSlice';
 import { clearErrors} from '../../redux/slices/authSlice';
 
 
 const Home = () => {
   const dispatch = useDispatch();
-  const { products, loading: productsLoading, error: productsError } = useSelector(state => state.product);
-  const { stores, loading: storesLoading, error: storesError } = useSelector(state => state.store);
+  const { products, loadingStates, error } = useSelector(state => state.product);
+  const { stores, loadingStates: storeLoadingStates, error: storesError } = useSelector(state => state.store);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   
   useEffect(() => {
     dispatch(clearErrors());
     dispatch(clearStoreErrors());
-    dispatch(getProducts());
+    dispatch(getAllProducts());
     dispatch(getStores());
   }, [dispatch]);
   
   const handleSearch = e => {
     e.preventDefault();
-    dispatch(getProducts({ search: searchTerm, category: selectedCategory }));
+    // For now, we'll just refetch all products since we removed the search params from getAllProducts
+    dispatch(getAllProducts());
+    // Later we should add filtering on the client side
   };
   
   const categories = [
@@ -37,7 +39,16 @@ const Home = () => {
     'Household'
   ];
 
-  if (productsError) return <div className="container mt-4"><div className="alert alert-danger">{productsError}</div></div>;
+  // Filter products based on search and category
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = !searchTerm || 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || 
+      product.category.toLowerCase() === selectedCategory.toLowerCase();
+    return matchesSearch && matchesCategory;
+  });
+
+  if (error) return <div className="container mt-4"><div className="alert alert-danger">{error}</div></div>;
   if (storesError) return <div className="container mt-4"><div className="alert alert-danger">{storesError}</div></div>;
   
   return (
@@ -79,15 +90,15 @@ const Home = () => {
       
       <h2 className="mb-4">Featured Products</h2>
       
-      {productsLoading ? (
+      {loadingStates.getAllProducts ? (
         <div className="text-center my-5">
           <div className="spinner-border" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
         </div>
-      ) : products.length > 0 ? (
+      ) : filteredProducts.length > 0 ? (
         <div className="row">
-          {products.map(product => (
+          {filteredProducts.map(product => (
             <div key={product._id} className="col-md-3 mb-4">
               <div className="card h-100">
                 {product.image && (
@@ -111,7 +122,7 @@ const Home = () => {
       
       <h2 className="mb-4 mt-5">Nearby Stores</h2>
       
-      {storesLoading ? (
+      {storeLoadingStates.getStores ? (
         <div className="text-center my-5">
           <div className="spinner-border" role="status">
             <span className="visually-hidden">Loading...</span>

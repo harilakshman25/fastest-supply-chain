@@ -5,33 +5,43 @@ import axios from 'axios';
 const initialState = {
   products: [],
   product: null,
-  loading: false,
+  loadingStates: {
+    getAllProducts: false,
+    getProductById: false,
+    getStoreProducts: false,
+    createProduct: false,
+    updateProduct: false,
+    deleteProduct: false,
+    updateProductQuantity: false
+  },
   error: null
 };
 
+// Helper function to clear product state
+const clearProductState = () => ({
+  products: [],
+  product: null,
+  loadingStates: {
+    getAllProducts: false,
+    getProductById: false,
+    getStoreProducts: false,
+    createProduct: false,
+    updateProduct: false,
+    deleteProduct: false,
+    updateProductQuantity: false
+  },
+  error: null
+});
+
 // Get all products
-export const getProducts = createAsyncThunk(
-  'product/getProducts',
-  async (params = {}, { rejectWithValue }) => {
+export const getAllProducts = createAsyncThunk(
+  'product/getAllProducts',
+  async (_, { rejectWithValue }) => {
     try {
-      const { sort, category, store, search } = params;
-      let url = '/api/products';
-      
-      // Build query string
-      const queryParams = [];
-      if (sort) queryParams.push(`sort=${sort}`);
-      if (category) queryParams.push(`category=${category}`);
-      if (store) queryParams.push(`store=${store}`);
-      if (search) queryParams.push(`search=${search}`);
-      
-      if (queryParams.length > 0) {
-        url += `?${queryParams.join('&')}`;
-      }
-      
-      const res = await axios.get(url);
+      const res = await axios.get('/api/products');
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to load products');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to load products');
     }
   }
 );
@@ -44,54 +54,25 @@ export const getProductById = createAsyncThunk(
       const res = await axios.get(`/api/products/${id}`);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to load product');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to load product');
     }
   }
 );
 
-// Get store products
+// Get products for a store
 export const getStoreProducts = createAsyncThunk(
-    'product/getStoreProducts',
-    async (storeId, { rejectWithValue }) => {
-      try {
-        const res = await axios.get(`/api/stores/${storeId}/products`);
-        return res.data;
-      } catch (err) {
-        const errorMessage = err.response?.data?.message || 
-                            err.response?.data?.msg || 
-                            'Failed to load store products';
-        return rejectWithValue(errorMessage);
-      }
-    }
-  );
-
-// Get products by category
-export const getProductsByCategory = createAsyncThunk(
-  'product/getProductsByCategory',
-  async (category, { rejectWithValue }) => {
+  'product/getStoreProducts',
+  async (storeId, { rejectWithValue }) => {
     try {
-      const res = await axios.get(`/api/products/category/${category}`);
+      const res = await axios.get(`/api/products/store/${storeId}`);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to load products');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to load store products');
     }
   }
 );
 
-// Search products
-export const searchProducts = createAsyncThunk(
-  'product/searchProducts',
-  async (term, { rejectWithValue }) => {
-    try {
-      const res = await axios.get(`/api/products/search/${term}`);
-      return res.data;
-    } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to search products');
-    }
-  }
-);
-
-// Create a product
+// Create a new product
 export const createProduct = createAsyncThunk(
   'product/createProduct',
   async (productData, { rejectWithValue }) => {
@@ -99,26 +80,23 @@ export const createProduct = createAsyncThunk(
       const res = await axios.post('/api/products', productData);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to create product');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to create product');
     }
   }
 );
 
 // Update a product
 export const updateProduct = createAsyncThunk(
-    'product/updateProduct',
-    async ({ id, productData }, { rejectWithValue }) => {
-      try {
-        const res = await axios.put(`/api/products/${id}`, productData);
-        return res.data;
-      } catch (err) {
-        const errorMessage = err.response?.data?.message || 
-                            err.response?.data?.msg || 
-                            'Failed to update product';
-        return rejectWithValue(errorMessage);
-      }
+  'product/updateProduct',
+  async ({ id, productData }, { rejectWithValue }) => {
+    try {
+      const res = await axios.put(`/api/products/${id}`, productData);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.msg || 'Failed to update product');
     }
-  );
+  }
+);
 
 // Delete a product
 export const deleteProduct = createAsyncThunk(
@@ -128,23 +106,20 @@ export const deleteProduct = createAsyncThunk(
       await axios.delete(`/api/products/${id}`);
       return id;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to delete product');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to delete product');
     }
   }
 );
 
-// Update product inventory
-export const updateProductInventory = createAsyncThunk(
-  'product/updateInventory',
+// Update product quantity
+export const updateProductQuantity = createAsyncThunk(
+  'product/updateProductQuantity',
   async ({ productId, storeId, quantity }, { rejectWithValue }) => {
     try {
-      const res = await axios.put(`/api/products/${productId}/inventory`, {
-        storeId,
-        quantity
-      });
+      const res = await axios.put(`/api/products/${productId}/inventory`, { storeId, quantity });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to update inventory');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to update inventory');
     }
   }
 );
@@ -155,135 +130,138 @@ const productSlice = createSlice({
   reducers: {
     clearProductErrors: (state) => {
       state.error = null;
+    },
+    clearCurrentProduct: (state) => {
+      state.product = null;
+    },
+    resetProductState: () => clearProductState(),
+    clearLoadingStates: (state) => {
+      Object.keys(state.loadingStates).forEach(key => {
+        state.loadingStates[key] = false;
+      });
     }
   },
   extraReducers: (builder) => {
     builder
       // Get all products
-      .addCase(getProducts.pending, (state) => {
-        state.loading = true;
+      .addCase(getAllProducts.pending, (state) => {
+        state.loadingStates.getAllProducts = true;
+        state.error = null;
       })
-      .addCase(getProducts.fulfilled, (state, action) => {
-        state.loading = false;
+      .addCase(getAllProducts.fulfilled, (state, action) => {
+        state.loadingStates.getAllProducts = false;
         state.products = action.payload;
+        state.error = null;
       })
-      .addCase(getProducts.rejected, (state, action) => {
-        state.loading = false;
+      .addCase(getAllProducts.rejected, (state, action) => {
+        state.loadingStates.getAllProducts = false;
         state.error = action.payload;
       })
       
       // Get product by ID
       .addCase(getProductById.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.getProductById = true;
+        state.error = null;
       })
       .addCase(getProductById.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getProductById = false;
         state.product = action.payload;
+        state.error = null;
       })
       .addCase(getProductById.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getProductById = false;
         state.error = action.payload;
       })
       
       // Get store products
       .addCase(getStoreProducts.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.getStoreProducts = true;
+        state.error = null;
       })
       .addCase(getStoreProducts.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getStoreProducts = false;
         state.products = action.payload;
+        state.error = null;
       })
       .addCase(getStoreProducts.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-      
-      // Get products by category
-      .addCase(getProductsByCategory.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(getProductsByCategory.fulfilled, (state, action) => {
-        state.loading = false;
-        state.products = action.payload;
-      })
-      .addCase(getProductsByCategory.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-      
-      // Search products
-      .addCase(searchProducts.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(searchProducts.fulfilled, (state, action) => {
-        state.loading = false;
-        state.products = action.payload;
-      })
-      .addCase(searchProducts.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getStoreProducts = false;
         state.error = action.payload;
       })
       
       // Create product
       .addCase(createProduct.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.createProduct = true;
+        state.error = null;
       })
       .addCase(createProduct.fulfilled, (state, action) => {
-        state.loading = false;
-        state.products = [...state.products, action.payload];
+        state.loadingStates.createProduct = false;
+        state.products.push(action.payload);
+        state.product = action.payload;
+        state.error = null;
       })
       .addCase(createProduct.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.createProduct = false;
         state.error = action.payload;
       })
       
       // Update product
       .addCase(updateProduct.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.updateProduct = true;
+        state.error = null;
       })
       .addCase(updateProduct.fulfilled, (state, action) => {
-        state.loading = false;
-        state.products = state.products.map(product => 
+        state.loadingStates.updateProduct = false;
+        state.products = state.products.map(product =>
           product._id === action.payload._id ? action.payload : product
         );
         state.product = action.payload;
+        state.error = null;
       })
       .addCase(updateProduct.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.updateProduct = false;
         state.error = action.payload;
       })
       
       // Delete product
       .addCase(deleteProduct.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.deleteProduct = true;
+        state.error = null;
       })
       .addCase(deleteProduct.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.deleteProduct = false;
         state.products = state.products.filter(product => product._id !== action.payload);
+        if (state.product && state.product._id === action.payload) {
+          state.product = null;
+        }
+        state.error = null;
       })
       .addCase(deleteProduct.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.deleteProduct = false;
         state.error = action.payload;
       })
       
-      // Update product inventory
-      .addCase(updateProductInventory.pending, (state) => {
-        state.loading = true;
+      // Update product quantity
+      .addCase(updateProductQuantity.pending, (state) => {
+        state.loadingStates.updateProductQuantity = true;
+        state.error = null;
       })
-      .addCase(updateProductInventory.fulfilled, (state, action) => {
-        state.loading = false;
-        state.products = state.products.map(product => 
+      .addCase(updateProductQuantity.fulfilled, (state, action) => {
+        state.loadingStates.updateProductQuantity = false;
+        state.products = state.products.map(product =>
           product._id === action.payload._id ? action.payload : product
         );
-        state.product = action.payload;
+        if (state.product && state.product._id === action.payload._id) {
+          state.product = action.payload;
+        }
+        state.error = null;
       })
-      .addCase(updateProductInventory.rejected, (state, action) => {
-        state.loading = false;
+      .addCase(updateProductQuantity.rejected, (state, action) => {
+        state.loadingStates.updateProductQuantity = false;
         state.error = action.payload;
       });
   }
 });
 
-export const { clearProductErrors } = productSlice.actions;
+export const { clearProductErrors, clearCurrentProduct, resetProductState, clearLoadingStates } = productSlice.actions;
 
 export default productSlice.reducer;

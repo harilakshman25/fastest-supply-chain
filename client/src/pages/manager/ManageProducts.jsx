@@ -43,8 +43,8 @@ const ManageProducts = () => {
   ];
   
   useEffect(() => {
-    if (user && user._id) {
-      dispatch(getStoreByManager(user._id));
+    if (user && user.id) {
+      dispatch(getStoreByManager(user.id));
     }
   }, [dispatch, user]);
   

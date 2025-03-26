@@ -5,11 +5,35 @@ import axios from 'axios';
 const initialState = {
   orders: [],
   order: null,
-  loading: false,
+  loadingStates: {
+    createOrder: false,
+    getUserOrders: false,
+    getOrderById: false,
+    getStoreOrders: false,
+    updateOrderStatus: false,
+    rateOrder: false,
+    requestReturn: false
+  },
   error: null
 };
 
-// Create a new order
+// Helper function to clear order state
+const clearOrderState = () => ({
+  orders: [],
+  order: null,
+  loadingStates: {
+    createOrder: false,
+    getUserOrders: false,
+    getOrderById: false,
+    getStoreOrders: false,
+    updateOrderStatus: false,
+    rateOrder: false,
+    requestReturn: false
+  },
+  error: null
+});
+
+// Create order
 export const createOrder = createAsyncThunk(
   'order/createOrder',
   async (orderData, { rejectWithValue }) => {
@@ -17,7 +41,7 @@ export const createOrder = createAsyncThunk(
       const res = await axios.post('/api/orders', orderData);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to create order');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to create order');
     }
   }
 );
@@ -27,10 +51,10 @@ export const getUserOrders = createAsyncThunk(
   'order/getUserOrders',
   async (_, { rejectWithValue }) => {
     try {
-      const res = await axios.get('/api/orders');
+      const res = await axios.get('/api/orders/me');
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to load orders');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to load orders');
     }
   }
 );
@@ -38,17 +62,17 @@ export const getUserOrders = createAsyncThunk(
 // Get order by ID
 export const getOrderById = createAsyncThunk(
   'order/getOrderById',
-  async (id, { rejectWithValue }) => {
+  async (orderId, { rejectWithValue }) => {
     try {
-      const res = await axios.get(`/api/orders/${id}`);
+      const res = await axios.get(`/api/orders/${orderId}`);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to load order');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to load order');
     }
   }
 );
 
-// Get store orders (for store managers)
+// Get store orders
 export const getStoreOrders = createAsyncThunk(
   'order/getStoreOrders',
   async (storeId, { rejectWithValue }) => {
@@ -56,7 +80,7 @@ export const getStoreOrders = createAsyncThunk(
       const res = await axios.get(`/api/orders/store/${storeId}`);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to load store orders');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to load store orders');
     }
   }
 );
@@ -69,7 +93,7 @@ export const updateOrderStatus = createAsyncThunk(
       const res = await axios.put(`/api/orders/${orderId}/status`, { status });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to update order status');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to update order status');
     }
   }
 );
@@ -82,7 +106,7 @@ export const rateOrder = createAsyncThunk(
       const res = await axios.post(`/api/orders/${orderId}/rate`, ratings);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to rate order');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to rate order');
     }
   }
 );
@@ -95,7 +119,7 @@ export const requestReturn = createAsyncThunk(
       const res = await axios.post(`/api/orders/${orderId}/return`, { reason });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response.data.msg || 'Failed to request return');
+      return rejectWithValue(err.response?.data?.msg || 'Failed to request return');
     }
   }
 );
@@ -109,91 +133,102 @@ const orderSlice = createSlice({
     },
     clearCurrentOrder: (state) => {
       state.order = null;
+    },
+    resetOrderState: () => clearOrderState(),
+    clearLoadingStates: (state) => {
+      Object.keys(state.loadingStates).forEach(key => {
+        state.loadingStates[key] = false;
+      });
     }
   },
   extraReducers: (builder) => {
     builder
       // Create order
       .addCase(createOrder.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.createOrder = true;
+        state.error = null;
       })
       .addCase(createOrder.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.createOrder = false;
         state.order = action.payload;
         state.orders = [action.payload, ...state.orders];
+        state.error = null;
       })
       .addCase(createOrder.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.createOrder = false;
         state.error = action.payload;
       })
       
       // Get user orders
       .addCase(getUserOrders.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.getUserOrders = true;
+        state.error = null;
       })
       .addCase(getUserOrders.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getUserOrders = false;
         state.orders = action.payload;
+        state.error = null;
       })
       .addCase(getUserOrders.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getUserOrders = false;
         state.error = action.payload;
       })
       
       // Get order by ID
       .addCase(getOrderById.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.getOrderById = true;
+        state.error = null;
       })
       .addCase(getOrderById.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getOrderById = false;
         state.order = action.payload;
+        state.error = null;
       })
       .addCase(getOrderById.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getOrderById = false;
         state.error = action.payload;
       })
       
       // Get store orders
       .addCase(getStoreOrders.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.getStoreOrders = true;
+        state.error = null;
       })
       .addCase(getStoreOrders.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getStoreOrders = false;
         state.orders = action.payload;
+        state.error = null;
       })
       .addCase(getStoreOrders.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.getStoreOrders = false;
         state.error = action.payload;
       })
       
       // Update order status
       .addCase(updateOrderStatus.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.updateOrderStatus = true;
+        state.error = null;
       })
       .addCase(updateOrderStatus.fulfilled, (state, action) => {
-        state.loading = false;
-        
-        // Update order in state
-        if (state.order && state.order._id === action.payload._id) {
-          state.order = action.payload;
-        }
-        
-        // Update order in orders array
-        state.orders = state.orders.map(order => 
+        state.loadingStates.updateOrderStatus = false;
+        state.order = action.payload;
+        state.orders = state.orders.map(order =>
           order._id === action.payload._id ? action.payload : order
         );
+        state.error = null;
       })
       .addCase(updateOrderStatus.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.updateOrderStatus = false;
         state.error = action.payload;
       })
       
       // Rate order
       .addCase(rateOrder.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.rateOrder = true;
+        state.error = null;
       })
       .addCase(rateOrder.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.rateOrder = false;
         
         // Update order in state
         if (state.order && state.order._id === action.payload._id) {
@@ -204,18 +239,20 @@ const orderSlice = createSlice({
         state.orders = state.orders.map(order => 
           order._id === action.payload._id ? action.payload : order
         );
+        state.error = null;
       })
       .addCase(rateOrder.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.rateOrder = false;
         state.error = action.payload;
       })
       
       // Request return
       .addCase(requestReturn.pending, (state) => {
-        state.loading = true;
+        state.loadingStates.requestReturn = true;
+        state.error = null;
       })
       .addCase(requestReturn.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingStates.requestReturn = false;
         
         // Update order in state
         if (state.order && state.order._id === action.payload._id) {
@@ -226,14 +263,15 @@ const orderSlice = createSlice({
         state.orders = state.orders.map(order => 
           order._id === action.payload._id ? action.payload : order
         );
+        state.error = null;
       })
       .addCase(requestReturn.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingStates.requestReturn = false;
         state.error = action.payload;
       });
   }
 });
 
-export const { clearOrderErrors, clearCurrentOrder } = orderSlice.actions;
+export const { clearOrderErrors, clearCurrentOrder, resetOrderState, clearLoadingStates } = orderSlice.actions;
 
 export default orderSlice.reducer;

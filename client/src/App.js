@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import store from './store';
+import { setupAxiosInterceptors } from './utils/setupAxios';
 import setAuthToken from './utils/setAuthToken';
 
 // Layout Components
@@ -50,90 +51,139 @@ import SystemAnalytics from './pages/admin/SystemAnalytics';
 // New child component for Redux logic
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
-import { loadUser } from './redux/slices/authSlice';
+import { loadUser, restoreAuthState, clearLoadingStates } from './redux/slices/authSlice';
 import axios from 'axios';
 
 // Set default base URL
 axios.defaults.baseURL = 'http://localhost:5000';
 
+// Setup axios interceptors
+setupAxiosInterceptors(store);
+
 // Child component that uses Redux hooks
 const AppContent = () => {
   const dispatch = useDispatch();
-  const { isAuthenticated, loading } = useSelector(state => state.auth);
+  const { isAuthenticated, user, loadingStates } = useSelector(state => state.auth);
 
   useEffect(() => {
-    if (localStorage.token) {
-      setAuthToken(localStorage.token);
-    }
-    dispatch(loadUser());
-    const { initializeSocket, disconnectSocket } = require('./utils/socket');
-    initializeSocket();
-    return () => {
-      disconnectSocket();
+    const initializeApp = async () => {
+      try {
+        console.log('Initializing app...');
+        console.log('Initial localStorage token:', localStorage.getItem('token'));
+        console.log('Initial localStorage user:', localStorage.getItem('user'));
+        
+        // First restore auth state from localStorage
+        dispatch(restoreAuthState());
+        console.log('After restoreAuthState - isAuthenticated:', isAuthenticated);
+        console.log('After restoreAuthState - user:', user);
+        
+        // If we have a token, verify it with the server
+        const token = localStorage.getItem('token');
+        if (token) {
+          console.log('Token found, loading user...');
+          await dispatch(loadUser()).unwrap();
+          console.log('User loaded, initializing socket...');
+          const { initializeSocket } = require('./utils/socket');
+          initializeSocket();
+        } else {
+          console.log('No token found in localStorage');
+        }
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+      } finally {
+        // Clear any lingering loading states
+        dispatch(clearLoadingStates());
+        console.log('App initialization complete');
+      }
     };
+
+    initializeApp();
   }, [dispatch]);
 
+  // Only show loading during initial app load
+  if (loadingStates.auth && !isAuthenticated) {
+    return (
+      <div className="container mt-5 text-center">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
-      <Navbar />
-      <main>
-        <ToastContainer />
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/register/manager" element={<ManagerRegister />} />
-          <Route path="/register/delivery" element={<DeliveryRegister />} />
-          <Route path="/store/:id" element={<StoreView />} />
-          <Route path="/product/:id" element={<ProductDetails />} />
+    <Router>
+      <div className="d-flex flex-column min-vh-100">
+        <Navbar />
+        <main className="flex-grow-1 py-4">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/register/manager" element={<ManagerRegister />} />
+            <Route path="/register/delivery" element={<DeliveryRegister />} />
+            <Route path="/store/:id" element={<StoreView />} />
+            <Route path="/product/:id" element={<ProductDetails />} />
 
-          {/* User Routes */}
-          <Route path="/cart" element={<PrivateRoute element={<Cart />} />} />
-          <Route path="/checkout" element={<PrivateRoute element={<Checkout />} />} />
-          <Route path="/order/success" element={<PrivateRoute element={<OrderSuccess />} />} />
-          <Route path="/profile" element={<PrivateRoute element={<UserProfile />} />} />
-          <Route path="/orders" element={<PrivateRoute element={<UserOrders />} />} />
-          <Route path="/order/:id/track" element={<PrivateRoute element={<OrderTracking />} />} />
+            {/* User Routes */}
+            <Route path="/cart" element={<PrivateRoute element={<Cart />} />} />
+            <Route path="/checkout" element={<PrivateRoute element={<Checkout />} />} />
+            <Route path="/order/success" element={<PrivateRoute element={<OrderSuccess />} />} />
+            <Route path="/profile" element={<PrivateRoute element={<UserProfile />} />} />
+            <Route path="/orders" element={<PrivateRoute element={<UserOrders />} />} />
+            <Route path="/order/:id/track" element={<PrivateRoute element={<OrderTracking />} />} />
 
-          {/* Store Manager Routes */}
-          <Route path="/manager/products" element={<PrivateRoute element={<ManageProducts />} roles={['store_manager']} />} />
-          <Route path="/manager/inventory" element={<PrivateRoute element={<ManageInventory />} roles={['store_manager']} />} />
-          <Route path="/manager/dashboard" element={<PrivateRoute element={<ManagerDashboard />} roles={['store_manager']} />} />
-          <Route path="/manager/orders" element={<PrivateRoute element={<ManagerOrders />} roles={['store_manager']} />} />
+            {/* Store Manager Routes */}
+            <Route path="/manager/products" element={<PrivateRoute element={<ManageProducts />} roles={['store_manager']} />} />
+            <Route path="/manager/inventory" element={<PrivateRoute element={<ManageInventory />} roles={['store_manager']} />} />
+            <Route path="/manager/dashboard" element={<PrivateRoute element={<ManagerDashboard />} roles={['store_manager']} />} />
+            <Route path="/manager/orders" element={<PrivateRoute element={<ManagerOrders />} roles={['store_manager']} />} />
 
-          {/* Delivery Person Routes */}
-          <Route path="/delivery/active" element={<PrivateRoute element={<ActiveDeliveries />} roles={['delivery']} />} />
-          <Route path="/delivery/dashboard" element={<PrivateRoute element={<DeliveryDashboard />} roles={['delivery']} />} />
-          <Route path="/delivery/history" element={<PrivateRoute element={<DeliveryHistory />} roles={['delivery']} />} />
+            {/* Delivery Person Routes */}
+            <Route path="/delivery/active" element={<PrivateRoute element={<ActiveDeliveries />} roles={['delivery']} />} />
+            <Route path="/delivery/dashboard" element={<PrivateRoute element={<DeliveryDashboard />} roles={['delivery']} />} />
+            <Route path="/delivery/history" element={<PrivateRoute element={<DeliveryHistory />} roles={['delivery']} />} />
 
-          {/* Admin Routes */}
-          <Route
-            path="/admin/dashboard"
-            element={<RoleRoute role="admin" element={<AdminDashboard />} />}
-          />
-          <Route
-            path="/admin/stores"
-            element={<RoleRoute role="admin" element={<ManageStores />} />}
-          />
-          <Route
-            path="/admin/users"
-            element={<RoleRoute role="admin" element={<ManageUsers />} />}
-          />
-          <Route
-            path="/admin/requests"
-            element={<RoleRoute role="admin" element={<RegistrationRequests />} />}
-          />
-          <Route
-            path="/admin/analytics"
-            element={<RoleRoute role="admin" element={<SystemAnalytics />} />}
-          />
-          <Route path="/checkout" element={<PrivateRoute element={<Checkout />} />} />
-          <Route path="/order/success" element={<PrivateRoute element={<OrderSuccess />} />} />
-        </Routes>
-      </main>
-      <Footer />
-    </>
+            {/* Admin Routes */}
+            <Route
+              path="/admin/dashboard"
+              element={<RoleRoute role="admin" element={<AdminDashboard />} />}
+            />
+            <Route
+              path="/admin/stores"
+              element={<RoleRoute role="admin" element={<ManageStores />} />}
+            />
+            <Route
+              path="/admin/users"
+              element={<RoleRoute role="admin" element={<ManageUsers />} />}
+            />
+            <Route
+              path="/admin/requests"
+              element={<RoleRoute role="admin" element={<RegistrationRequests />} />}
+            />
+            <Route
+              path="/admin/analytics"
+              element={<RoleRoute role="admin" element={<SystemAnalytics />} />}
+            />
+            <Route path="/checkout" element={<PrivateRoute element={<Checkout />} />} />
+            <Route path="/order/success" element={<PrivateRoute element={<OrderSuccess />} />} />
+          </Routes>
+        </main>
+        <Footer />
+      </div>
+      <ToastContainer 
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </Router>
   );
 };
 
@@ -141,9 +191,7 @@ const AppContent = () => {
 const App = () => {
   return (
     <Provider store={store}>
-      <Router>
-        <AppContent />
-      </Router>
+      <AppContent />
     </Provider>
   );
 };

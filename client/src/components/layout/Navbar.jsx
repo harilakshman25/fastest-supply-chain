@@ -5,7 +5,7 @@ import { logout } from '../../redux/slices/authSlice';
 import { resetStoreState } from '../../redux/slices/storeSlice';
 
 const Navbar = () => {
-  const { isAuthenticated, user} = useSelector(state => state.auth);
+  const { isAuthenticated, user, loading } = useSelector(state => state.auth);
   const { cartItems } = useSelector(state => state.cart);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -13,13 +13,15 @@ const Navbar = () => {
   console.log('Navbar user:', user);
   console.log('isAuthenticated:', isAuthenticated);
 
-  const onLogout = () => {
-    dispatch(logout())
-      .unwrap()
-      .then(() =>{
-        // dispatch(resetStoreState()); 
-        navigate('/')})
-      .catch(err => console.error('Logout failed:', err));
+  const onLogout = async () => {
+    try {
+      await dispatch(logout()).unwrap();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Even if logout fails, we should still navigate away
+      navigate('/');
+    }
   };
 
   const authLinks = (

@@ -2,6 +2,8 @@
 const Store = require('../models/Store');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
+const mongoose = require('mongoose');
 const { validationResult } = require('express-validator');
 
 // @desc    Get all stores
@@ -44,16 +46,46 @@ exports.getStoreById = async (req, res) => {
 exports.getStoreByManager = async (req, res) => {
   try {
     const managerId = req.params.managerId;
+    console.log('Server received getStoreByManager request for ID:', managerId);
+    console.log('Request user:', req.user);
+    console.log('Is managerId a valid ObjectId?', mongoose.Types.ObjectId.isValid(managerId));
+    
+    // Validate that the user can only access their own store
+    if (req.user.role === 'store_manager' && req.user.id !== managerId) {
+      console.log(`User ${req.user.id} tried to access store of manager ${managerId}`);
+      return res.status(403).json({ msg: 'Not authorized to access this store' });
+    }
+    
     if (!mongoose.Types.ObjectId.isValid(managerId)) {
+      console.log('Invalid manager ID:', managerId);
       return res.status(400).json({ msg: 'Invalid manager ID' });
     }
-    const store = await Store.findOne({ manager: new mongoose.Types.ObjectId(managerId), isActive: true });
+    
+    const objectId = new mongoose.Types.ObjectId(managerId);
+    console.log('Converted to ObjectId:', objectId);
+    console.log('Finding store with query:', { manager: objectId, isActive: true });
+    
+    // Try to find the store for this manager
+    const store = await Store.findOne({ manager: objectId, isActive: true });
+    console.log('Found store:', store);
+    
     if (!store) {
-      return res.status(404).json({ msg: 'Store not found for this manager' });
+      console.log('No store found for manager ID:', managerId);
+      // Check if the user with this ID exists and is a store manager
+      const user = await User.findById(managerId);
+      if (!user) {
+        return res.status(404).json({ msg: 'User not found' });
+      }
+      if (user.role !== 'store_manager') {
+        return res.status(400).json({ msg: 'User is not a store manager' });
+      }
+      return res.status(404).json({ msg: 'No store has been assigned to this manager yet' });
     }
+    
+    console.log('Returning store:', store);
     res.json(store);
   } catch (err) {
-    console.error(err.message);
+    console.error('getStoreByManager server error:', err.message);
     res.status(500).send('Server Error');
   }
 };
@@ -137,7 +169,7 @@ exports.getStoreStats = async (req, res) => {
       topProducts,
     });
   } catch (err) {
-    console.error(err.message);
+    console.error('Error in getStoreStats:', err.message);
     res.status(500).send('Server Error');
   }
 };

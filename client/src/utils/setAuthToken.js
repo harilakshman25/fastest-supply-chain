@@ -1,20 +1,17 @@
 import axios from 'axios';
 
-export const setAuthToken = (token )=> {
-  const currentToken = localStorage.getItem('token');
-  if (token === currentToken) {
-    console.log('Token unchanged, skipping set');
-    return;
-  }
-  console.log('Setting token:', token);
-  if (token) {
-    axios.defaults.headers.common['x-auth-token'] = token;
-    localStorage.setItem('token', token);
-  } else {
-    console.log('Removing token');
+const setAuthToken = (token) => {
+  if (!token) {
+    console.log('Removing auth token from headers');
     delete axios.defaults.headers.common['x-auth-token'];
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return;
   }
+
+  console.log('Setting auth token in headers:', token.substring(0, 15) + '...');
+  axios.defaults.headers.common['x-auth-token'] = token;
+  localStorage.setItem('token', token);
 };
 
 export default setAuthToken;

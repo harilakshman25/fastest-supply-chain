@@ -10,8 +10,8 @@ import { getStatusBadgeClass, getNextStatuses } from '../../utils/orderUtils';
 const ManagerOrders = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
-  const { store } = useSelector(state => state.store);
-  const { orders, loading } = useSelector(state => state.order);
+  const { store, loadingStates: storeLoadingStates, error: storeError } = useSelector(state => state.store);
+  const { orders, loadingStates: orderLoadingStates, error: orderError } = useSelector(state => state.order);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -19,8 +19,8 @@ const ManagerOrders = () => {
   const [viewOrder, setViewOrder] = useState(null);
   
   useEffect(() => {
-    if (user && user._id) {
-      dispatch(getStoreByManager(user._id));
+    if (user && user.id) {
+      dispatch(getStoreByManager(user.id));
     }
   }, [dispatch, user]);
   
@@ -140,6 +140,49 @@ const ManagerOrders = () => {
     return filtered;
   })();
   
+  // Show loading state during initial store load
+  if (storeLoadingStates.getStoreByManager) {
+    return (
+      <div className="container mt-5 text-center">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show store error if any
+  if (storeError) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger">
+          <h4 className="alert-heading">Error Loading Store</h4>
+          <p>{storeError}</p>
+          <hr />
+          <p className="mb-0">
+            Please try refreshing the page. If the problem persists, contact support.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no store is found
+  if (!store) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-warning">
+          <h4 className="alert-heading">No Store Found</h4>
+          <p>No store has been assigned to your account yet.</p>
+          <hr />
+          <p className="mb-0">
+            If you believe this is an error, please contact the administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="container mt-5">
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -197,11 +240,20 @@ const ManagerOrders = () => {
             </div>
           </div>
           
-          {loading ? (
+          {orderLoadingStates.getStoreOrders ? (
             <div className="text-center my-5">
               <div className="spinner-border" role="status">
-                <span className="visually-hidden">Loading...</span>
+                <span className="visually-hidden">Loading orders...</span>
               </div>
+            </div>
+          ) : orderError ? (
+            <div className="alert alert-danger">
+              <h4 className="alert-heading">Error Loading Orders</h4>
+              <p>{orderError}</p>
+              <hr />
+              <p className="mb-0">
+                Please try refreshing the page. If the problem persists, contact support.
+              </p>
             </div>
           ) : filteredOrders.length > 0 ? (
             <div className="table-responsive">
@@ -379,10 +431,15 @@ const ManagerOrders = () => {
                   type="button" 
                   className="btn btn-secondary" 
                   onClick={() => setViewOrder(null)}
+                  disabled={orderLoadingStates.updateOrderStatus}
                 >
                   Close
                 </button>
-                <button type="button" className="btn btn-primary">
+                <button 
+                  type="button" 
+                  className="btn btn-primary"
+                  disabled={orderLoadingStates.updateOrderStatus}
+                >
                   Print Order
                 </button>
               </div>

@@ -3,11 +3,15 @@ import { Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 const PrivateRoute = ({ element }) => {
-  const { isAuthenticated, loading } = useSelector(state => state.auth);
+  const { isAuthenticated, user } = useSelector(state => state.auth);
 
-  if (loading) return <div className="container mt-5 text-center">Loading...</div>;
-  
-  return isAuthenticated ? element : <Navigate to="/login" />;
+  // If we have both isAuthenticated and user, render the element
+  if (isAuthenticated && user) {
+    return element;
+  }
+
+  // If not authenticated, redirect to login
+  return <Navigate to="/login" />;
 };
 
 export default PrivateRoute;
