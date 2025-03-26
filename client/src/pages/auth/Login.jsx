@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch,useSelector } from 'react-redux';
 import { login } from '../../redux/slices/authSlice';
 import { toast } from 'react-toastify';
-
+import { useEffect } from 'react';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -14,7 +14,7 @@ const Login = () => {
   
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading } = useSelector(state => state.auth);
+  const { user,isAuthenticated,loading} = useSelector(state => state.auth);
 
   const { email, password } = formData;
 
@@ -26,22 +26,35 @@ const Login = () => {
   const onSubmit = async e => {
     e.preventDefault();
     try {
-      const result=await dispatch(login({ email, password })).unwrap();
-      console.log(result);
-      let userRole=result.user.role;
-      if(userRole==='admin') navigate('/admin/dashboard');
-      else if(userRole==="store_manager") navigate('/manager/dashboard');
-      else if(userRole==='delivery') navigate('/delivery/dashboard');
-      else navigate('/');
+      const result = await dispatch(login({ email, password })).unwrap();
+      console.log("Login successful:", result);
     } catch (error) {
       console.error('Login failed:', error);
-      toast.error(error);
+      const errorMessage = typeof error === 'string' ? error : error.msg || 'Login failed';
+      toast.error(errorMessage);
     }
   };
 
+  // Navigate after auth state updates
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const userRole = user.role;
+      if (userRole === 'admin') navigate('/admin/dashboard');
+      else if (userRole === "store_manager") navigate('/manager/dashboard');
+      else if (userRole === 'delivery') navigate('/delivery/dashboard');
+      else navigate('/');
+    }
+  }, [isAuthenticated, user, navigate]);
+
   return (
     <div className="container mt-5">
-      {/* {loading && <div className="spinner" />} */}
+     {loading && (
+        <div className="container mt-5 text-center">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      )}
       <div className="row justify-content-center">
         <div className="col-md-6">
           <div className="card shadow">

@@ -41,6 +41,7 @@ export const getStoreByManager = createAsyncThunk(
   'store/getStoreByManager',
   async (managerId, { rejectWithValue }) => {
     try {
+      console.log('getStoreByManager request for managerId:', managerId);
       const res = await axios.get(`/api/stores/manager/${managerId}`);
       return res.data;
     } catch (err) {
@@ -81,19 +82,28 @@ const storeSlice = createSlice({
   reducers: {
     clearStoreErrors: (state) => {
       state.error = null;
+    },
+    resetStoreState: (state) => {
+      return initialState; // Reset to initial state
+    },
+    clearLoading: (state) => {
+      state.loading = false;
     }
   },
   extraReducers: (builder) => {
     builder
       // Get all stores
       .addCase(getStores.pending, (state) => {
+        console.log("pending stores")
         state.loading = true;
       })
       .addCase(getStores.fulfilled, (state, action) => {
+        console.log("stores fullfilled")
         state.loading = false;
         state.stores = action.payload;
       })
       .addCase(getStores.rejected, (state, action) => {
+        console.log("stores rejected")
         state.loading = false;
         state.error = action.payload;
       })
@@ -113,13 +123,16 @@ const storeSlice = createSlice({
       
       // Get store by manager ID
       .addCase(getStoreByManager.pending, (state) => {
+        console.log('getStoreByManager pending');
         state.loading = true;
       })
       .addCase(getStoreByManager.fulfilled, (state, action) => {
+        console.log('getStoreByManager fulfilled:', action.payload);
         state.loading = false;
         state.store = action.payload;
       })
       .addCase(getStoreByManager.rejected, (state, action) => {
+        console.log('getStoreByManager rejected:', action.payload);
         state.loading = false;
         state.error = action.payload;
       })
@@ -152,6 +165,6 @@ const storeSlice = createSlice({
   }
 });
 
-export const { clearStoreErrors } = storeSlice.actions;
+export const { clearStoreErrors ,resetStoreState, clearLoading} = storeSlice.actions;
 
 export default storeSlice.reducer;

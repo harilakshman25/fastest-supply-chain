@@ -2,23 +2,40 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { getStoreByManager, getStoreStats } from '../../redux/slices/storeSlice';
+import { getStoreByManager, getStoreStats} from '../../redux/slices/storeSlice';
 import { getStoreOrders } from '../../redux/slices/orderSlice';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 
 const ManagerDashboard = () => {
   const dispatch = useDispatch();
-  const { user } = useSelector(state => state.auth);
+  const { user,isAuthenticated } = useSelector(state => state.auth);
   const { store, stats, loading ,error } = useSelector(state => state.store);
   const { orders } = useSelector(state => state.order);
+  const navigate = useNavigate();
+
   
+
+  console.log('ManagerDashboard store:', store); // Add this log
+  console.log('ManagerDashboard error:', error);
+  console.log(user);
+  
+
+
   const [timeRange, setTimeRange] = useState('week');
   
   useEffect(() => {
     if (user && user._id) {
+      console.log('Dispatching getStoreByManager with user._id:', user._id);
       dispatch(getStoreByManager(user._id));
+    }else{
+      dispatch({ type: 'store/clearLoading' });
+      if (!user) {
+        navigate('/login');
+      }
     }
-  }, [dispatch, user]);
+  }, [dispatch, user, isAuthenticated,navigate]);
   
   useEffect(() => {
     if (store && store._id) {
@@ -30,12 +47,19 @@ const ManagerDashboard = () => {
   const handleTimeRangeChange = (e) => {
     setTimeRange(e.target.value);
   };
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
   
   const getPendingOrdersCount = () => {
     return orders?.filter(order => order.status === 'pending').length || 0;
   };
-  
-  if (loading || !store) {
+
+  if (!user) {
+    return <div className="container mt-5 text-center text-danger">Please log in to access the dashboard.</div>;
+  }
+  if (loading) {
     return (
       <div className="container mt-5 text-center">
         <div className="spinner-border" role="status">
@@ -44,10 +68,10 @@ const ManagerDashboard = () => {
       </div>
     );
   }
-
-  console.log(error);
-
   if (error) return <div className="container mt-5 text-center text-danger">Error: {error}</div>;
+  if (!store) {
+    return <div className="container mt-5 text-center text-danger">No store found for this manager.</div>;
+  }
   
   return (
     <div className="container mt-5">

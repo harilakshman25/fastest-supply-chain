@@ -43,13 +43,99 @@ exports.getStoreById = async (req, res) => {
 // @access  Private (Store Manager)
 exports.getStoreByManager = async (req, res) => {
   try {
-    const store = await Store.findOne({ manager: req.params.managerId });
-    
+    const managerId = req.params.managerId;
+    if (!mongoose.Types.ObjectId.isValid(managerId)) {
+      return res.status(400).json({ msg: 'Invalid manager ID' });
+    }
+    const store = await Store.findOne({ manager: new mongoose.Types.ObjectId(managerId), isActive: true });
     if (!store) {
       return res.status(404).json({ msg: 'Store not found for this manager' });
     }
-    
     res.json(store);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+exports.getStoreStats = async (req, res) => {
+  try {
+    const storeId = req.params.id;
+    const { timeRange } = req.query; // e.g., 'day', 'week', 'month', 'year'
+
+    // Verify that the store exists and the user is authorized
+    const store = await Store.findById(storeId);
+    if (!store) {
+      return res.status(404).json({ msg: 'Store not found' });
+    }
+    if (req.user.role === 'store_manager' && store.manager.toString() !== req.user.id) {
+      return res.status(401).json({ msg: 'Not authorized' });
+    }
+
+    // Define the date range based on timeRange
+    let startDate;
+    const now = new Date();
+    switch (timeRange) {
+      case 'day':
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+        break;
+      case 'week':
+        startDate = new Date(now.setDate(now.getDate() - now.getDay()));
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date(0); // All time
+    }
+
+    // Get orders for the store within the date range
+    const orders = await Order.find({
+      store: storeId,
+      createdAt: { $gte: startDate },
+    });
+
+    // Calculate total orders and total revenue
+    const totalOrders = orders.length;
+    const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+
+    // Get total products in the store
+    const products = await Product.find({ 'inventory.store': storeId });
+    const totalProducts = products.length;
+
+    // Calculate top products (based on quantity sold in orders)
+    const productSales = {};
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        const productId = item.product.toString();
+        if (!productSales[productId]) {
+          productSales[productId] = { quantity: 0, revenue: 0, name: item.name };
+        }
+        productSales[productId].quantity += item.quantity;
+        productSales[productId].revenue += item.price * item.quantity;
+      });
+    });
+
+    const topProducts = Object.keys(productSales)
+      .map(productId => ({
+        name: productSales[productId].name,
+        quantity: productSales[productId].quantity,
+        revenue: productSales[productId].revenue,
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+
+    // Return the stats
+    res.json({
+      totalOrders,
+      totalRevenue,
+      totalProducts,
+      topProducts,
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

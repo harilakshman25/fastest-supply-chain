@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';
+import { resetStoreState } from '../../redux/slices/storeSlice';
 
 const Navbar = () => {
   const { isAuthenticated, user} = useSelector(state => state.auth);
@@ -9,10 +10,15 @@ const Navbar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  console.log('Navbar user:', user);
+  console.log('isAuthenticated:', isAuthenticated);
+
   const onLogout = () => {
     dispatch(logout())
       .unwrap()
-      .then(() => navigate('/'))
+      .then(() =>{
+        // dispatch(resetStoreState()); 
+        navigate('/')})
       .catch(err => console.error('Logout failed:', err));
   };
 

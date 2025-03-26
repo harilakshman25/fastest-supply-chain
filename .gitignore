@@ -4,4 +4,4 @@ client/build/
 client/public/
 server/node_modules/
 server/.env
-./node_modules
+./node_modules/

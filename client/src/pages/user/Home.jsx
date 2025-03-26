@@ -3,7 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getProducts } from '../../redux/slices/productSlice';
-import { getStores } from '../../redux/slices/storeSlice';
+import { getStores, clearStoreErrors} from '../../redux/slices/storeSlice';
+import { clearErrors} from '../../redux/slices/authSlice';
+
 
 const Home = () => {
   const dispatch = useDispatch();
@@ -13,6 +15,8 @@ const Home = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   
   useEffect(() => {
+    dispatch(clearErrors());
+    dispatch(clearStoreErrors());
     dispatch(getProducts());
     dispatch(getStores());
   }, [dispatch]);

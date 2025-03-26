@@ -66,4 +66,6 @@ router.get('/nearby', storeController.getNearbyStores);
 // @access  Public
 router.get('/:id/products', storeController.getStoreProducts);
 
+router.get('/:id/stats', auth, storeController.getStoreStats);
+
 module.exports = router;

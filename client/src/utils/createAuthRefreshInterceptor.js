@@ -31,13 +31,17 @@ const createAuthRefreshInterceptor = () => {
         isRefreshing = true;
 
         try {
-          const res = await axios.post('/api/auth/refresh-token', {}, { timeout: 5000 });
+          const currentToken = localStorage.getItem('token');
+          console.log('Attempting to refresh token with current token:', currentToken);
+          const res = await axios.post('/api/auth/refresh-token', { token: currentToken }, { timeout: 5000 });
           const { token } = res.data;
+          console.log('New token received:', token);
           setAuthToken(token);
           originalRequest.headers['x-auth-token'] = token;
           processQueue(null, token);
           return axios(originalRequest);
         } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError.response?.data);
           processQueue(refreshError, null);
           store.dispatch(logout());
           return Promise.reject(refreshError);

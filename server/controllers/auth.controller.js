@@ -44,9 +44,6 @@ exports.register = async (req, res) => {
       },
     };
 
-    if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET is not defined in environment variables');
-    }
 
     jwt.sign(
       payload,
@@ -78,44 +75,50 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    //For admin 
-    if(email==="admin@gmail.com"){
-       let adminpassword=process.env.ADMIN_PASSWORD;
-       if(password!==adminpassword){
+    if (email === "admin@gmail.com") {
+      console.log("hi");
+      const adminPassword = process.env.ADMIN_PASSWORD;
+      if (password !== adminPassword) {
         return res.status(400).json({ msg: 'Invalid Credentials' });
-       }
-       const payload = {
+      }
+      const adminId = "admin-static-id"; // Use a static ID for the admin
+      const payload = {
         user: {
-          id: mongoose.Schema.Types.ObjectId,
+          id: adminId,
           role: "admin"
         }
       };
-      const userData = { id:mongoose.Schema.Types.ObjectId, name: "admin", email: "admin@gmail.com",role:"admin"}
+
+      const userData = {
+        id: adminId,
+        name: "admin",
+        email: "admin@gmail.com",
+        role: "admin"
+      };
+
       jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5 days' }, (err, token) => {
         if (err) throw err;
-        return res.json({ token, user: userData });
+        res.json({ token, user: userData });
       });
-     
+
+      return;
     }
-    // See if user exists
+
     let user = await User.findOne({ email });
 
     if (!user) {
       return res.status(400).json({ msg: 'Invalid Credentials' });
     }
-    // Check if user is approved
-    user.isApproved=true;
+    
     if (!user.isApproved) {
       return res.status(400).json({ msg: 'Your account is pending approval' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
       return res.status(400).json({ msg: 'Invalid Credentials' });
     }
 
-    // Return jsonwebtoken
     const payload = {
       user: {
         id: user.id,
@@ -124,6 +127,7 @@ exports.login = async (req, res) => {
     };
 
     const userData = { id: user.id, name: user.name, email, role: user.role };
+
     jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5 days' }, (err, token) => {
       if (err) throw err;
       res.json({ token, user: userData });
@@ -135,11 +139,11 @@ exports.login = async (req, res) => {
   }
 };
 
+
 // @desc    Register a store manager
 // @route   POST /api/auth/register/manager
 // @access  Public
 exports.registerManager = async (req, res) => {
-  console.log("hi");
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -172,7 +176,7 @@ exports.registerManager = async (req, res) => {
       phoneNumber,
       address:address,
       role: 'store_manager',
-      isApproved: true
+      isApproved: false
     });
 
     // Encrypt password
@@ -264,7 +268,18 @@ exports.registerDelivery = async (req, res) => {
 // @access  Private
 exports.getCurrentUser = async (req, res) => {
   try {
+    if (req.user.role === 'admin' && req.user.id === 'admin-static-id') {
+      return res.json({
+        id: req.user.id,
+        name: "admin",
+        email: "admin@gmail.com",
+        role: "admin"
+      });
+    }
     const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
     res.json(user);
   } catch (err) {
     console.error(err.message);
